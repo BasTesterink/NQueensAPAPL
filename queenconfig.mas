@@ -1,0 +1,16 @@
+<apaplmas>
+	<environment name="env" file="QueensEnv.jar"/>
+	<agent name="beatrix" file="Queen.2apl"/>
+	<agent name="elizabeth" file="Queen.2apl"/>
+	<agent name="cercei" file="Queen.2apl"/>
+	<agent name="cleopatra" file="Queen.2apl"/>
+	<agent name="mariaTheresa" file="Queen.2apl"/>
+	<agent name="joan" file="Queen.2apl"/>
+	<agent name="catherine" file="Queen.2apl"/>
+	<agent name="isabella" file="Queen.2apl"/>
+	<agent name="q1" file="Queen.2apl"/>
+	<agent name="q2" file="Queen.2apl"/>
+	<agent name="q3" file="Queen.2apl"/>
+	<agent name="q4" file="Queen.2apl"/>
+	<agent name="q5" file="Queen.2apl"/>
+</apaplmas>

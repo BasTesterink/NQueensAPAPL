@@ -1,0 +1,72 @@
+/* 
+ * Queen agent. Queens perform a brute force search by acting like counting wheels. The first 
+ * moves to the bottom, and then signals the the second to move. After the second moves, she
+ * asks the first to do another round. Finally when the second reaches the bottom she asks the third
+ * to move etc.
+ * Author: Bas Testerink, Utrecht University, The Netherlands
+ */  
+ beliefs:
+	position(0).																// The agent's Y position
+	lower(X,Y):- Y is X + 1.												// Needed for belief update precondition
+	upper(X,Y):- Y is X - 1.
+	list_length(List, L):- 												// Length of a list divided by 2
+		length(List, Le), 
+		L is Le/2.
+	nth2([X|_],0,X).														// Select the nth element (nth/2 built-in is prolog dependent)
+	nth2([_|R],C,X):- 
+		C > 0, 
+		C2 is C-1, 
+		nth2(R,C2,X).
+	at_end:- 																	// Whether agent stands at the end of the board
+		neighbor_count(Length), 
+		position(P), 
+		P2 is P+1, 
+		P2 = Length.
+	right_neighbor(MyNr, List,Right) :- 						// Grab the right/left neighbor
+		C is (MyNr+1)*2, 
+		nth2(List,C,Right).
+	
+beliefupdates: 
+	{position(P), upper(P,NewP)} Move(up) {not position(P), position(NewP)}		// Movement
+	{position(P), lower(P,NewP)} Move(down) {not position(P), position(NewP)}
+	{list_length(L,Length)} NeighborCount([_|L]) {neighbor_count(Length)}		// Store the amount of participants
+	
+plans:  
+	@env(perceive(),L);  							// Get the initial board
+	if(B(L=[])){											// See if participating
+		print('Not participating.');
+	} else {													// When participating, store the amount of other queens
+		NeighborCount(L);
+		if(B(L=[0|Tail])){								// The first queen
+			@env(set_move_delay(0),_);		// Set the movement delay in ms
+			move(0,Tail); 									// Kick-off
+		} 
+	}
+	
+pcrules: 
+	move(_,[First|_]) <- not(at_end) | {	// The basic move, when not at the end is just to go down
+		@env(move(down),_);
+		Move(down);
+		@env(finished(),_); 							// Check whether solution is found
+		send(First,inform,request(move)); // Tell the first queen to move again
+	}
+
+	move(MyNr,List) <- at_end | {				// When at the end
+		while(B(not(position(0)))){				// Go to position 0 
+			@env(move(up),_);
+			Move(up);
+		}
+		notify_right(MyNr,List);					// Tell the right neighbor to move
+	}
+	message(_,_,_,_,request(move)) <- true | {
+		@env(perceive(),L);  						// Requests to move are always honored
+		B(L=[MyNr|List]);
+		move(MyNr,List);
+	}
+	
+	// Messaging to right neighbor
+	notify_right(MyNr,List) <- right_neighbor(MyNr, List,Right) | {send(Right,inform,request(move));}
+	notify_right(MyNr,[First|_])<-true|{
+		print('All solutions found'); // The last queen cannot message towards the right...
+														// ...so all possible configurations are visited when she reaches the end of the board.
+	} 

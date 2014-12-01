@@ -1,0 +1,126 @@
+/* 
+ * Queen agent. Queens pass along control to solve the puzzle. First off, the second queen q adjusts herself to 
+ * prevent violating the rules with the queen on her left (the first queen), after which q tells the one on her right to adjust. 
+ * If one of the queens q' cannot find a legal spot to move to, then q' can tell the one on the left to move to
+ * another legal spot. However, if that queen q'' cannot do that, q'' will tell the one left of q'' to move etc.
+ * Until one can move legally and then reports back to the right. 
+ * Author: Bas Testerink, Utrecht University, The Netherlands
+ */  
+beliefs:   
+	position(0).																// The agent's Y position
+	lower(X,Y):- Y is X + 1.												// Needed for belief update precondition
+	upper(X,Y):- Y is X - 1.
+	list_length(List, L):- 												// Length of a list divided by 2
+		length(List, Le), 
+		L is Le/2.
+	nth2([X|_],0,X).														// Select the nth element (nth/2 built-in is prolog dependent)
+	nth2([_|R],C,X):- 
+		C > 0, 
+		C2 is C-1, 
+		nth2(R,C2,X).
+		
+	at_end:- 																	// Whether agent stands at the end of the board
+		neighbor_count(Length), 
+		position(P), 
+		P2 is P+1, 
+		P2 = Length.
+	 
+	adopt_legal(alternative,MyNr,List,Result):- 		// Check for a legal position below the current one
+		position(P), 
+		neighbor_count(C),
+		P2 is P + 1,
+		P2 < C,
+		try_positions(P2,List, MyNr, Result).  				
+	adopt_legal(adjustment,MyNr,List,Result):- 		// Check for a legal position starting from 0
+		try_positions(0,List, MyNr, Result). 
+	adopt_legal(_,_,_,-1).												// No legal position found
+	
+	try_positions(Current, List, MyNr, Current):- 		// Check if the current candidate is legal
+		legal_position(0, MyNr, List, Current).
+	try_positions(Current,List, MyNr, Result):- 			// Try another position if available
+		C2 is Current+1, 
+		neighbor_count(L2), 
+		C2 < L2, 
+		try_positions(C2,List,MyNr,Result).
+	
+	legal_position(Me,Me,_,P).										// Returned to checking oneself, so no attacks found
+	legal_position(Other,Me,[_,OtherP|Rest],P):-		// Check whether attacking Other
+		Other < Me,
+		not(attacks(Me,P,Other,OtherP)),
+		Next is Other + 1,
+		legal_position(Next,Me,Rest,P).
+		
+	attacks(_,Y,_,Y).														// Shared X-axis means attack
+	attacks(Nr,Y,Nr2,Y2):- 											// If delta x and y are equal, then that is also an attack
+		D1 is (Nr-Nr2)*(Nr-Nr2), 
+		D2 is (Y-Y2)*(Y-Y2), 
+		D1 = D2.
+	
+	right_neighbor(MyNr, List,Right) :- C is (MyNr+1)*2, nth2(List,C,Right). // Grab the right/left neighbor
+	left_neighbor(MyNr, List,Left) :- C is (MyNr-1)*2, nth2(List,C,Left).
+		
+beliefupdates: 
+	{position(P), upper(P,NewP)} Move(up) {not position(P), position(NewP)}		// Movement
+	{position(P), lower(P,NewP)} Move(down) {not position(P), position(NewP)}
+	{list_length(L,Length)} NeighborCount([_|L]) {neighbor_count(Length)}		// Store the amount of participants
+	 
+plans: 
+	@env(perceive(),L);  									// Initial plan: get status, see if participant
+	if(B(L=[])){
+		print('Not participating.');
+	} else {
+		NeighborCount(L);									// If participant, then store the amount of other queens
+		if(B(L=[1|_])){
+			@env(set_move_delay(0),_);				// Delay in ms per move for animation
+			go_to_legal_position(adjustment); 	// The second queen kicks off movement
+		} 
+	}
+	
+pcrules:   
+	go_to_legal_position(Type) <- true | {
+		@env(perceive(),L);									// Get the board
+		B(L=[MyNr|Positions]); 
+		if(B(MyNr=0)){
+			first_queen_move(Positions);				// First queen moves differently
+		} else {
+			B(adopt_legal(Type,MyNr,Positions,Pos)); 	// Check for legal position
+			if(B(Pos < 0)){										// If no legal position possible...
+				notify_left(MyNr,Positions);			// ... then notify the left neighbor to move
+			} else {
+				move_towards(Pos);							// Otherwise move towards the legal position
+				notify_right(MyNr,Positions);
+			}
+		}
+	}
+
+	move_towards(Pos) <- true | {
+		B(position(P));
+		while(B(not(position(Pos)))){				// While not at the right place, move up or down
+				if(B(P<Pos)) { 
+					@env(move(down)); 
+					Move(down); 
+				} else { 
+					@env(move(up)); 
+					Move(up); 
+				}
+			}
+	}
+	
+first_queen_move(List) <- true | {
+	if(B(at_end)){											// When the first queen has to move away from the end, then we are done
+		print('All solutions found');
+	} else { 														// Otherwise move down
+		@env(move(down));
+		Move(down);
+		notify_right(0,List);
+	} 
+}  
+	
+// Communications, agents can send each other requests to move (but not WHERE to move!). 
+message(_,_,_,_,request(X)) <- true | { go_to_legal_position(X); }
+notify_left(MyNr,List) <- left_neighbor(MyNr, List,Left)  | {send(Left,inform, request(alternative));}
+notify_right(MyNr,List) <- right_neighbor(MyNr, List,Right) | {send(Right,inform,request(adjustment));}
+notify_right(MyNr,List)<-true|{
+		@env(finished(),_);  			// Last queen has no right neighbor so this rule fires
+		notify_left(MyNr,List) ;		// She checks the solution and continues the search
+	}  

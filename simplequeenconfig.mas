@@ -1,0 +1,11 @@
+<apaplmas>
+	<environment name="env" file="QueensEnv.jar"/>
+	<agent name="beatrix" file="simplequeen.2apl"/>
+	<agent name="elizabeth" file="simplequeen.2apl"/>
+	<agent name="cercei" file="simplequeen.2apl"/>
+	<agent name="cleopatra" file="simplequeen.2apl"/>
+	<agent name="mariaTheresa" file="simplequeen.2apl"/>
+	<agent name="joan" file="simplequeen.2apl"/>
+	<agent name="catherine" file="simplequeen.2apl"/>
+	<agent name="isabella" file="simplequeen.2apl"/>
+</apaplmas>

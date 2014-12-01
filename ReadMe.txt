@@ -1,0 +1,8 @@
+- Start terminal
+- Change directory to this folder
+- java -jar "2APL Interpreter.jar"
+- Open either the queenconfig or simplequeenconfig
+- Give number of queens (if more than 8 please add to mas files)
+- Hit play
+- Solutions are automatically stored in resources/solutions and will be overwritten each run
+- Enjoy
